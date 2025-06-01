@@ -1,0 +1,7 @@
+__pycache__
+backup
+model
+synth_data
+training_data
+venv
+*.zip
