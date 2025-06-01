@@ -10,6 +10,10 @@ def predict(model, hero1_feats, hero2_feats):
     
     half = TOTAL_INPUT_FEATURES // 2
     if len(hero1_feats) != half or len(hero2_feats) != half:
+        print(f"\n🚨 Input feature length mismatch")
+        print(f"🚨 Each hero must have exactly {half} features (half of TOTAL_INPUT_FEATURES = {TOTAL_INPUT_FEATURES})")
+        print(f"🚨 But received lengths: hero1_feats={len(hero1_feats)}, hero2_feats={len(hero2_feats)}")
+        print(f"🚨 Check your feature extraction and constants to ensure consistency.\n")
         raise ValueError(
             f"Input feature length mismatch:\n"
             f"Each hero must have exactly {half} features (half of TOTAL_INPUT_FEATURES = {TOTAL_INPUT_FEATURES}).\n"

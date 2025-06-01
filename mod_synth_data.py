@@ -1,19 +1,14 @@
 import csv
 import os
 import random
+from hero_action import select_action
 from hero_archetypes import ARCHETYPES
+from hero_features import one_hot_class
 from mod_globals import ACTIONS, ALL_FEATURES, CLASS_LABELS, STAT_NAMES
 
 SYNTH_DATA_DIR = './synth_data'
 SYNTH_DATA_PATH = os.path.join(SYNTH_DATA_DIR, 'synthetic_data.csv')
 
-
-# Normalize to 0-1
-def normalize(value, min_val, max_val):
-    return (value - min_val) / (max_val - min_val)
-
-def one_hot_class(hero_class):
-    return [1 if hero_class == cls else 0 for cls in CLASS_LABELS]
 
 #def sample_stats_for_class(hero_class):
 #    return {stat: random.randint(*ARCHETYPES[hero_class][stat]) for stat in STAT_NAMES}
@@ -39,62 +34,7 @@ def sample_current_hp_mana(stats):
     current_mana = random.randint(int(mana * 0.3), mana)
     return current_hp, current_mana
 
-def hero_to_features(stats, cur_hp, cur_mana, hero_class):
-    norm_stats = [normalize(stats[stat], *ARCHETYPES[hero_class][stat]) for stat in STAT_NAMES]
-    hp_ratio = cur_hp / stats["HP"] if stats["HP"] > 0 else 0
-    mana_ratio = cur_mana / stats["Mana"] if stats["Mana"] > 0 else 0
-    return norm_stats + [hp_ratio, mana_ratio] + one_hot_class(hero_class)
 
-def select_action(stats, cur_hp, cur_mana, opponent_hp):
-    str_ = stats.get('str', 0)
-    sta = stats.get('sta', 0)
-    agi = stats.get('agi', 0)
-    dex = stats.get('dex', 0)
-    int_ = stats.get('int', 0)
-    wis = stats.get('wis', 0)
-    cha = stats.get('cha', 0)
-    HP = stats.get('HP', 1)
-    Mana = stats.get('Mana', 1)
-
-    hp_ratio = cur_hp / HP
-    mana_ratio = cur_mana / Mana
-
-    action_weights = {a: 0 for a in ACTIONS}
-
-    # Aggressive play if opponent is low
-    if opponent_hp < HP:
-        action_weights['melee_attack'] += 10
-        action_weights['magic_missile'] += 10
-
-    if hp_ratio < 0.3:
-        action_weights['block'] += 50
-        if wis > 60:
-            action_weights['heal'] += 40
-    else:
-        if str_ > 70:
-            action_weights['melee_attack'] += 40
-            action_weights['block'] += 10
-
-        if int_ > 70 and mana_ratio > 0.5:
-            action_weights['magic_missile'] += 40
-            action_weights['wand'] += 30
-
-        if agi > 70 or dex > 70:
-            action_weights['dodge'] += 40
-            action_weights['fire_bow'] += 30
-
-    # Base weight
-    for a in action_weights:
-        if action_weights[a] == 0:
-            action_weights[a] = 5
-
-    total = sum(action_weights.values())
-    rnd = random.random() * total
-    cumulative = 0
-    for action, weight in action_weights.items():
-        cumulative += weight
-        if rnd <= cumulative:
-            return action
 
 def create_synthetic_data(num_samples=1000, force_regenerate=False):
     if os.path.exists(SYNTH_DATA_PATH) and not force_regenerate:
