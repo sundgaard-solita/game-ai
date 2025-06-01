@@ -1,29 +1,11 @@
 import csv
 import os
 import random
-from mod_globals import ACTIONS, CLASS_LABELS, NUM_FEATURES, STAT_NAMES
+from hero_archetypes import ARCHETYPES
+from mod_globals import ACTIONS, ALL_FEATURES, CLASS_LABELS, STAT_NAMES
 
 SYNTH_DATA_DIR = './synth_data'
 SYNTH_DATA_PATH = os.path.join(SYNTH_DATA_DIR, 'synthetic_data.csv')
-
-ARCHETYPES = {
-    'Warrior': {
-        'str': (70, 100), 'sta': (60, 90), 'agi': (40, 70), 'dex': (40, 70),
-        'int': (10, 40), 'wis': (30, 60), 'cha': (30, 60), 'HP': (80, 100), 'Mana': (10, 30)
-    },
-    'Rogue': {
-        'str': (40, 70), 'sta': (50, 80), 'agi': (70, 100), 'dex': (70, 100),
-        'int': (20, 50), 'wis': (30, 60), 'cha': (40, 70), 'HP': (60, 80), 'Mana': (10, 30)
-    },
-    'Mage': {
-        'str': (10, 30), 'sta': (10, 40), 'agi': (20, 50), 'dex': (40, 70),
-        'int': (80, 100), 'wis': (50, 80), 'cha': (30, 60), 'HP': (30, 60), 'Mana': (80, 100)
-    },
-    'Cleric': {
-        'str': (40, 70), 'sta': (50, 80), 'agi': (30, 60), 'dex': (40, 70),
-        'int': (40, 70), 'wis': (70, 100), 'cha': (40, 70), 'HP': (60, 90), 'Mana': (50, 80)
-    }
-}
 
 
 # Normalize to 0-1
@@ -33,8 +15,22 @@ def normalize(value, min_val, max_val):
 def one_hot_class(hero_class):
     return [1 if hero_class == cls else 0 for cls in CLASS_LABELS]
 
-def sample_stats_for_class(hero_class):
-    return {stat: random.randint(*ARCHETYPES[hero_class][stat]) for stat in STAT_NAMES}
+#def sample_stats_for_class(hero_class):
+#    return {stat: random.randint(*ARCHETYPES[hero_class][stat]) for stat in STAT_NAMES}
+
+def sample_features_for_class(hero_class):
+    defined_feats = ARCHETYPES[hero_class]
+    missing_feats = [feat for feat in ALL_FEATURES if feat not in defined_feats]
+    if missing_feats:
+        print(f"🚨 Missing features in ARCHETYPES[{hero_class}]: {missing_feats}.")
+        print(f"🤔 Did we forget to define these features? Please check ARCHETYPES.")
+        raise KeyError(f"Missing feature definitions for: {missing_feats}")
+    
+    # Sample all features (base stats + extras)
+    return {feat: random.randint(*defined_feats[feat]) for feat in ALL_FEATURES}
+
+
+
 
 def sample_current_hp_mana(stats):
     hp = stats["HP"]
@@ -50,7 +46,16 @@ def hero_to_features(stats, cur_hp, cur_mana, hero_class):
     return norm_stats + [hp_ratio, mana_ratio] + one_hot_class(hero_class)
 
 def select_action(stats, cur_hp, cur_mana, opponent_hp):
-    str_, sta, agi, dex, int_, wis, cha, HP, Mana = [stats[stat] for stat in STAT_NAMES]
+    str_ = stats.get('str', 0)
+    sta = stats.get('sta', 0)
+    agi = stats.get('agi', 0)
+    dex = stats.get('dex', 0)
+    int_ = stats.get('int', 0)
+    wis = stats.get('wis', 0)
+    cha = stats.get('cha', 0)
+    HP = stats.get('HP', 1)
+    Mana = stats.get('Mana', 1)
+
     hp_ratio = cur_hp / HP
     mana_ratio = cur_mana / Mana
 
@@ -103,7 +108,7 @@ def create_synthetic_data(num_samples=1000, force_regenerate=False):
         writer = csv.writer(csvfile)
 
         # Header
-        stat_fields = STAT_NAMES + ["cur_HP_ratio", "cur_Mana_ratio"] + CLASS_LABELS
+        stat_fields = ALL_FEATURES + ["cur_HP_ratio", "cur_Mana_ratio"] + CLASS_LABELS
         header = [f'hero1_{f}' for f in stat_fields] + [f'hero2_{f}' for f in stat_fields] + ['next_action']
         writer.writerow(header)
 
@@ -111,19 +116,31 @@ def create_synthetic_data(num_samples=1000, force_regenerate=False):
             hero1_class = random.choice(CLASS_LABELS)
             hero2_class = random.choice(CLASS_LABELS)
 
-            hero1_stats = sample_stats_for_class(hero1_class)
-            hero2_stats = sample_stats_for_class(hero2_class)
+            try:
+                hero1_stats = sample_features_for_class(hero1_class)
+                hero2_stats = sample_features_for_class(hero2_class)           
 
-            hero1_cur_hp, hero1_cur_mana = sample_current_hp_mana(hero1_stats)
-            hero2_cur_hp, hero2_cur_mana = sample_current_hp_mana(hero2_stats)
+                hero1_cur_hp, hero1_cur_mana = sample_current_hp_mana(hero1_stats)
+                hero2_cur_hp, hero2_cur_mana = sample_current_hp_mana(hero2_stats)
 
-            features1 = hero_to_features(hero1_stats, hero1_cur_hp, hero1_cur_mana, hero1_class)
-            features2 = hero_to_features(hero2_stats, hero2_cur_hp, hero2_cur_mana, hero2_class)
+                #hero1_features = [hero1_stats[f] for f in ALL_FEATURES]
+                hero1_features = [hero1_stats[f] for f in ALL_FEATURES] + [
+                    hero1_cur_hp / hero1_stats['HP'],
+                    hero1_cur_mana / hero1_stats['Mana']
+                ] + one_hot_class(hero1_class)
+
+                #hero2_features = [hero2_stats[f] for f in ALL_FEATURES]
+                hero2_features = [hero2_stats[f] for f in ALL_FEATURES] + [
+                    hero2_cur_hp / hero2_stats['HP'],
+                    hero2_cur_mana / hero2_stats['Mana']
+                ] + one_hot_class(hero2_class)
+            except KeyError:
+                return  # Suppress traceback for known error
 
             action = select_action(hero1_stats, hero1_cur_hp, hero1_cur_mana, hero2_cur_hp)
 
-            writer.writerow(features1 + features2 + [action])
-            data.append((features1 + features2, action))
+            writer.writerow(hero1_features + hero2_features + [action])
+            data.append((hero1_features + hero2_features, action))
 
     print(f"💾 Synthetic data saved to {SYNTH_DATA_PATH}")
     return data

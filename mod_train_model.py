@@ -4,21 +4,23 @@ from safetensors.torch import save_file
 import os
 import datetime
 from mod_action_predictor import ActionPredictor
-from mod_globals import ACTIONS, MODEL_DIR, MODEL_PATH
+from mod_globals import ACTIONS, MODEL_DIR, MODEL_PATH, TOTAL_INPUT_FEATURES
 
 def train_ai_model(
     data,
     epochs=10000,
     hidden_dim=64,
-    lr=0.00005, #0.0003,
+    lr=0.00005,  # 0.0003,
     optimizer_type="adamw"
 ):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"🤖 Training on {device.upper()} using {optimizer_type.upper()} (lr={lr}, epochs={epochs})...")
 
-    # Define model dynamically with chosen hidden size
+    print(f"[DEBUG] TOTAL_INPUT_FEATURES in train_ai_model: {TOTAL_INPUT_FEATURES}")
 
-    model = ActionPredictor(hidden_dim=hidden_dim).to(device)
+    # model = ActionPredictor(hidden_dim=hidden_dim).to(device)
+    model = ActionPredictor(total_num_of_feature=TOTAL_INPUT_FEATURES, hidden_dim=hidden_dim).to(device)  # use generic input size
+
     criterion = nn.CrossEntropyLoss()
 
     if optimizer_type.lower() == "adamw":
@@ -26,11 +28,14 @@ def train_ai_model(
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    inputs = torch.tensor([d[0] for d in data], dtype=torch.float32).to(device)
+    # inputs = torch.tensor([d[0] for d in data], dtype=torch.float32).to(device)
+    inputs = torch.tensor([item[0] for item in data], dtype=torch.float32).to(device)  # generic feature vector
 
-    # Map action string to index
-    label_map = {a: i for i, a in enumerate(ACTIONS)}
-    targets = torch.tensor([label_map[d[1]] for d in data], dtype=torch.long).to(device)
+    # label_map = {a: i for i, a in enumerate(ACTIONS)}
+    label_map = {a: i for i, a in enumerate(ACTIONS)}  # unchanged
+
+    # targets = torch.tensor([label_map[d[1]] for d in data], dtype=torch.long).to(device)
+    targets = torch.tensor([label_map[d[1]] for d in data], dtype=torch.long).to(device)  # unchanged
 
     for epoch in range(epochs):
         optimizer.zero_grad()

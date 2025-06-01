@@ -2,23 +2,30 @@ import random
 import sys
 import time
 import csv
-from mod_globals import WINS_CSV_PATH
+from mod_globals import EXTRA_FEATURES, WINS_CSV_PATH
 from mod_synth_data import ARCHETYPES, CLASS_LABELS, STAT_NAMES, normalize, one_hot_class, hero_to_features
 from mod_predict import predict
 
 def init_hero():
     hero_class = random.choice(CLASS_LABELS)
-    stats = {stat: random.randint(*ARCHETYPES[hero_class][stat]) for stat in STAT_NAMES}
-    full_hp = stats['HP']
-    full_mana = stats['Mana']
+    
+    # Combine STAT_NAMES and EXTRA_FEATURES to initialize all features
+    all_features = STAT_NAMES + EXTRA_FEATURES
+    
+    features = {feature: random.randint(*ARCHETYPES[hero_class][feature]) for feature in all_features}
+    
+    full_hp = features['HP']
+    full_mana = features['Mana']
     cur_hp = full_hp
     cur_mana = full_mana
+    
     return {
         'class': hero_class,
-        'stats': stats,
+        'features': features,
         'cur_hp': cur_hp,
         'cur_mana': cur_mana
     }
+
 
 def display_hero(hero, label="Hero"):
     stats_str = f"{label} Class: {hero['class']} | " + \
@@ -144,12 +151,12 @@ def play_game(predict_model):
 
     while hero1['cur_hp'] > 0 and hero2['cur_hp'] > 0:
         # Prepare normalized features
-        hero1_features = hero_to_features(hero1['stats'], hero1['cur_hp'], hero1['cur_mana'], hero1['class'])
-        hero2_features = hero_to_features(hero2['stats'], hero2['cur_hp'], hero2['cur_mana'], hero2['class'])
+        hero1_features = hero_to_features(hero1['features'], hero1['cur_hp'], hero1['cur_mana'], hero1['class'])
+        hero2_features = hero_to_features(hero2['features'], hero2['cur_hp'], hero2['cur_mana'], hero2['class'])
 
         # Print round + hero stats in one line
-        status_line = f"Round {round_num} | Hero1: {hero1['class']} HP {hero1['cur_hp']}/{hero1['stats']['HP']} | Mana {hero1['cur_mana']}/{hero1['stats']['Mana']} || " \
-                      f"Hero2: {hero2['class']} HP {hero2['cur_hp']}/{hero2['stats']['HP']} | Mana {hero2['cur_mana']}/{hero2['stats']['Mana']}"
+        status_line = f"Round {round_num} | Hero1: {hero1['class']} HP {hero1['cur_hp']}/{hero1['features']['HP']} | Mana {hero1['cur_mana']}/{hero1['features']['Mana']} || " \
+                      f"Hero2: {hero2['class']} HP {hero2['cur_hp']}/{hero2['features']['HP']} | Mana {hero2['cur_mana']}/{hero2['features']['Mana']}"
         print_overwrite(status_line)
 
         # Predict actions
