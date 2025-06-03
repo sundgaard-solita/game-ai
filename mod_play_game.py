@@ -5,12 +5,12 @@ import csv
 import os
 from hero_action import apply_damage, update_hero_after_action
 from hero_features import hero_to_features
-from mod_globals import EXTRA_FEATURES, WINS_CSV_PATH
-from mod_synth_data import ARCHETYPES, CLASS_LABELS, STAT_NAMES
+from mod_globals import EXTRA_FEATURES, STAT_NAMES, WINS_CSV_PATH
+from mod_synth_data import ARCHETYPES, HERO_CLASS_NAMES
 from mod_predict import predict
 
 def init_hero():
-    hero_class = random.choice(CLASS_LABELS)
+    hero_class = random.choice(HERO_CLASS_NAMES)
     
     # Combine STAT_NAMES and EXTRA_FEATURES to initialize all features
     all_features = STAT_NAMES + EXTRA_FEATURES
@@ -45,7 +45,7 @@ def append_to_wins_csv(hero1_features, hero2_features, action):
 
     header = None
     if not os.path.isfile(WINS_CSV_PATH):
-        stat_fields = STAT_NAMES + ["cur_HP_ratio", "cur_Mana_ratio"] + CLASS_LABELS
+        stat_fields = STAT_NAMES + ["cur_HP_ratio", "cur_Mana_ratio"] + HERO_CLASS_NAMES
         header = [f'hero1_{f}' for f in stat_fields] + [f'hero2_{f}' for f in stat_fields] + ['next_action']
 
     with open(WINS_CSV_PATH, 'a', newline='') as f:

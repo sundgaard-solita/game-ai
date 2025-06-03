@@ -53,7 +53,7 @@ def main():
 
         elif choice == '2':
             force = input("Force regenerate data? (y/N): ").strip().lower() == 'y'
-            create_synthetic_data(num_samples=5000, force_regenerate=force)
+            create_synthetic_data(num_samples=20000, force_regenerate=force)
 
         elif choice == '3':
             data = load_synthetic_data()

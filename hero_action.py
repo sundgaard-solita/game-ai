@@ -2,36 +2,6 @@ from hero_state import clamp_resources, init_flags
 from mod_globals import ACTIONS
 import random
 
-def select_action(hero, opponent_hp):
-    weights = {a: 5 for a in ACTIONS}
-
-    if opponent_hp < hero.max_hp:
-        weights['melee_attack'] += 10
-        weights['magic_missile'] += 10
-
-    if hero.hp_ratio < 0.3:
-        weights['block'] += 50
-        if hero.wis > 60:
-            weights['heal'] += 40
-    else:
-        if hero.str_ > 70 and hero.sta_ratio > 0.3:
-            weights['melee_attack'] += 40
-            weights['block'] += 10
-        if hero.int_ > 70 and hero.mana_ratio > 0.5:
-            weights['magic_missile'] += 40
-            weights['wand'] += 30
-        if (hero.agi > 70 or hero.dex > 70) and hero.sta_ratio > 0.2:
-            weights['dodge'] += 40
-            weights['fire_bow'] += 30
-
-    total = sum(weights.values())
-    rnd = random.random() * total
-    cumulative = 0
-    for action, weight in weights.items():
-        cumulative += weight
-        if rnd <= cumulative:
-            return action
-
 def apply_damage(target, damage):
         # Dodging chance to avoid damage
         if target.get('is_dodging', False):
@@ -52,7 +22,6 @@ def apply_damage(target, damage):
         target['cur_hp'] -= damage
         print(f"💥 {target['class']} takes {damage} damage!")
 
-
 def update_hero_after_action(hero, action, opponent):
     init_flags(hero)
 
@@ -63,7 +32,9 @@ def update_hero_after_action(hero, action, opponent):
         'block': perform_block,
         'dodge': perform_dodge,
         'wand': perform_wand,
-        'fire_bow': perform_fire_bow
+        'fire_bow': perform_fire_bow,
+        'rest': perform_rest,
+        'cast_protection_1': perform_cast_protection_1,
     }
 
     if action in action_funcs:
@@ -73,7 +44,6 @@ def update_hero_after_action(hero, action, opponent):
 
     clamp_resources(hero)
     clamp_resources(opponent)
-
 
 def perform_melee_attack(hero, opponent):
     cost = 15
@@ -134,3 +104,17 @@ def perform_fire_bow(hero, opponent):
         apply_damage(opponent, damage)
     else:
         print("⚡ Not enough mana for fire bow!")
+
+def perform_rest(hero, opponent):
+    """Restore a bit of stamina and mana."""
+    hero.cur_sta = min(hero.cur_sta + int(hero.features['sta'] * 0.2), hero.features['sta'])
+    hero.cur_mana = min(hero.cur_mana + int(hero.features['mana'] * 0.1), hero.features['mana'])
+
+def perform_cast_protection_1(hero, opponent):
+    """Apply a temporary protection buff (dummy logic)."""
+    # You can expand this as needed for actual buff tracking
+    if hero.cur_mana >= 5:
+        hero.cur_mana -= 5
+        hero.buffs['protection'] = 2  # Lasts 2 rounds, reduce incoming damage maybe?
+    else:
+        print(f"⚡ Not enough mana to cast protection!")
