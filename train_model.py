@@ -3,8 +3,8 @@ import torch.nn as nn
 from safetensors.torch import save_file
 import os
 import datetime
-from mod_action_predictor import ActionPredictor
-from mod_globals import ACTIONS, MODEL_DIR, MODEL_PATH, TOTAL_INPUT_FEATURES
+from action_predictor import ActionPredictor
+from app_config import CONFIG
 
 def train_ai_model(
     data,
@@ -16,10 +16,10 @@ def train_ai_model(
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"🤖 Training on {device.upper()} using {optimizer_type.upper()} (lr={lr}, epochs={epochs})...")
 
-    print(f"[DEBUG] TOTAL_INPUT_FEATURES in train_ai_model: {TOTAL_INPUT_FEATURES}")
+    print(f"[DEBUG] TOTAL_INPUT_FEATURES in train_ai_model: {CONFIG.TOTAL_INPUT_FEATURES}")
 
     # model = ActionPredictor(hidden_dim=hidden_dim).to(device)
-    model = ActionPredictor(total_num_of_feature=TOTAL_INPUT_FEATURES, hidden_dim=hidden_dim).to(device)  # use generic input size
+    model = ActionPredictor(total_num_of_feature=CONFIG.TOTAL_INPUT_FEATURES, hidden_dim=hidden_dim).to(device)  # use generic input size
 
     criterion = nn.CrossEntropyLoss()
 
@@ -32,7 +32,7 @@ def train_ai_model(
     inputs = torch.tensor([item[0] for item in data], dtype=torch.float32).to(device)  # generic feature vector
 
     # label_map = {a: i for i, a in enumerate(ACTIONS)}
-    label_map = {a: i for i, a in enumerate(ACTIONS)}  # unchanged
+    label_map = {a: i for i, a in enumerate(CONFIG.ACTIONS)}  # unchanged
 
     # targets = torch.tensor([label_map[d[1]] for d in data], dtype=torch.long).to(device)
     targets = torch.tensor([label_map[d[1]] for d in data], dtype=torch.long).to(device)  # unchanged
@@ -49,13 +49,13 @@ def train_ai_model(
 
     print("✅ AI model trained!")
 
-    os.makedirs(MODEL_DIR, exist_ok=True)
+    os.makedirs(CONFIG.MODEL_DIR, exist_ok=True)
     state_dict = model.state_dict()
-    save_file({k: v for k, v in state_dict.items()}, MODEL_PATH)
+    save_file({k: v for k, v in state_dict.items()}, CONFIG.MODEL_PATH)
 
     date_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-    backup_path = os.path.join(MODEL_DIR, f'gameai_{date_stamp}.safetensor')
+    backup_path = os.path.join(CONFIG.MODEL_DIR, f'gameai_{date_stamp}.safetensor')
     save_file({k: v for k, v in state_dict.items()}, backup_path)
 
-    print(f"💾 Model saved as {MODEL_PATH} and backup created.")
+    print(f"💾 Model saved as {CONFIG.MODEL_PATH} and backup created.")
     return model
