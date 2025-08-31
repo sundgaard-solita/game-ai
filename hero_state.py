@@ -39,7 +39,7 @@ class HeroState:
 def clamp_resources(hero:Hero):
     hero.features['rem_hp'] = max(0, hero.features['rem_hp'])
     hero.features['rem_mana'] = max(0, hero.features['rem_mana'])
-    hero.features['rem_sta'] = min(0, hero.features['rem_sta'])
+    hero.features['rem_sta'] = max(0, hero.features['rem_sta'])
 
 def init_flags(hero):
     #hero.setdefault('is_blocking', False)

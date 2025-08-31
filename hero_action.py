@@ -23,7 +23,7 @@ def apply_damage(target:Hero, damage):
         target.features['rem_hp'] -= damage
         print(f"💥 {target.class_name} takes {damage} damage!")
 
-def update_hero_after_action(hero, action, opponent):
+def update_hero_after_action(hero:Hero, action, opponent:Hero):
     init_flags(hero)
 
     action_funcs = {
@@ -77,14 +77,22 @@ def perform_heal(hero:Hero, opponent:Hero):
         print("⚡ Not enough mana to heal!")
 
 def perform_block(hero:Hero, opponent:Hero):
-    hero.features['is_blocking'] = True
-    hero.features['rem_sta'] = max(0, hero.features['rem_sta'] - 10)
-    print(f"🛡️ {hero.class_name} is blocking this turn.")
+    cost = 10
+    if(hero.features['rem_sta']>cost):
+        hero.features['is_blocking'] = True
+        hero.features['rem_sta'] = max(0, hero.features['rem_sta'] - cost)
+        print(f"🛡️ {hero.class_name} is blocking this turn.")
+    else:
+        print("🪫 Not enough stamina to block!")
 
 def perform_dodge(hero:Hero, opponent:Hero):
-    hero.features['is_dodging'] = True
-    hero.features['rem_sta'] = max(0, hero.features['rem_sta'] - 8)
-    print(f"💨 {hero.class_name} tries to dodge the next attack.")
+    cost = 8
+    if(hero.features['rem_sta']>cost):
+        hero.features['is_dodging'] = True
+        hero.features['rem_sta'] = max(0, hero.features['rem_sta'] - cost)
+        print(f"💨 {hero.class_name} tries to dodge the next attack.")
+    else:
+        print("🪫 Not enough stamina to dodge!")
 
 def perform_wand(hero:Hero, opponent:Hero):
     cost = 8
@@ -107,10 +115,15 @@ def perform_fire_bow(hero:Hero, opponent:Hero):
         print("⚡ Not enough mana for fire bow!")
 
 def perform_rest(hero:Hero, opponent:Hero):
-    """Restore a bit of stamina and mana."""
+    """Restore a bit of stamina and mana."""    
+    rem_sta_before = hero.features['rem_sta']
+    rem_hp_before = hero.features['rem_hp']
+    rem_mana_before = hero.features['rem_mana']
     hero.features['rem_sta'] = min(hero.features['rem_sta'] + int(hero.features['sta'] * 0.2), hero.features['sta'])
     hero.features['rem_hp'] = min(hero.features['rem_hp'] + int(hero.features['hp'] * 0.2), hero.features['hp'])
     hero.features['rem_mana'] = min(hero.features['rem_mana'] + int(hero.features['mana'] * 0.1), hero.features['mana'])
+    print(f"🪫 Regained {hero.features['rem_sta']-rem_sta_before} stamina, {hero.features['rem_hp']-rem_hp_before} hp and {hero.features['rem_mana']-rem_mana_before} mana!")
+    
 
 def perform_cast_protection_1(hero:Hero, opponent:Hero):
     """Apply a temporary protection buff (dummy logic)."""
