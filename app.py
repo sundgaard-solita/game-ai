@@ -4,7 +4,7 @@ import torch
 from safetensors.torch import load_file
 from action_predictor import ActionPredictor
 from app_config import CONFIG
-from play_game import play_game
+from play_game import play_games
 from predict import predict_random_sample
 from synth_data import create_synthetic_data, load_synthetic_data
 from train_model import train_ai_model
@@ -35,11 +35,13 @@ def check_cuda():
 
 # ----- Main Menu -----
 def main():
+    os.system("cls")
     model = None
 
     while True:
         print("\n🌟 DND Heroes League Menu 🌟")
         print("1. Play Game")
+        print("6. Play Multiple Games")
         print("2. Create Synthetic Data")
         print("3. Train AI Model")
         print("4. Predict Hero Action")
@@ -49,7 +51,11 @@ def main():
 
         if choice == '1':
             model = model or load_model(hidden_dim=128)
-            play_game(model)
+            play_games(model, 1, 30, 0.5)
+        
+        elif choice == '6':
+            model = model or load_model(hidden_dim=128)
+            play_games(model, 10000, 15, 0)
 
         elif choice == '2':
             force = input("Force regenerate data? (y/N): ").strip().lower() == 'y'

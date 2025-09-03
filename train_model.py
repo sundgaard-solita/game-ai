@@ -6,6 +6,13 @@ import datetime
 from action_predictor import ActionPredictor
 from app_config import CONFIG
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def save_model(model):
+    state_dict = model.state_dict()
+    save_file({k: v for k, v in state_dict.items()}, CONFIG.MODEL_PATH)
+    return state_dict
+
 def train_ai_model(
     data,
     epochs=10000,
@@ -50,8 +57,7 @@ def train_ai_model(
     print("✅ AI model trained!")
 
     os.makedirs(CONFIG.MODEL_DIR, exist_ok=True)
-    state_dict = model.state_dict()
-    save_file({k: v for k, v in state_dict.items()}, CONFIG.MODEL_PATH)
+    state_dict = save_model(model)
 
     date_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     backup_path = os.path.join(CONFIG.MODEL_DIR, f'gameai_{date_stamp}.safetensor')

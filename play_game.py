@@ -3,14 +3,18 @@ import sys
 import time
 import csv
 import os
+
+from torch import nn
+import torch
 from app_config import CONFIG
+from app_logger import DEBUG, INFO, logger
 from hero import Hero
 from hero_action import update_hero_after_action
 from hero_archetypes import get_hero_class_name
 from hero_features import create_hero
 from synth_data import ARCHETYPES
 from predict import predict
-
+from train_model import DEVICE
 
 def display_hero(hero, label="Hero"):
     stats_str = f"{label} Class: {get_hero_class_name(hero)} | " + \
@@ -41,11 +45,17 @@ def print_overwrite(text):
     sys.stdout.write(text)
     sys.stdout.flush()
 
-def play_game(predict_model):
-    print("🎲 Welcome to DND Heroes League!")
+def play_game(predict_model, max_rounds:int=10, round_lag:float=0.1):
     hero1 = create_hero()#hero1, hero1['rem_hp'], hero1['rem_mana'], hero1['class'])
     hero2 = create_hero()#hero2, hero2['rem_hp'], hero2['rem_mana'], hero2['class'])
     round_num = 1
+
+    # ⚙️ Set up optimizer once for the model (outside play loop)
+    optimizer = torch.optim.AdamW(predict_model.parameters(), lr=1e-3)
+    criterion = nn.CrossEntropyLoss()  # loss = how wrong action choice was
+
+    # 📦 Memory buffer: store states + chosen actions during this battle
+    battle_memory = []
 
     while hero1.features['rem_hp'] > 0 and hero2.features['rem_hp'] > 0:
         # Prepare normalized features
@@ -63,37 +73,77 @@ def play_game(predict_model):
             f"🔮 Mana {hero2.features['rem_mana']}/{hero2.features['mana']} | "
             f"💪 Sta {hero2.features['rem_sta']}/{hero2.features['sta']}"
         )
-        print_overwrite(status_line)
+        logger.debug('\r' + ' ' * 120 + '\r')
+        logger.debug(status_line)
 
         # 🧠 Predict actions
-        action1 = predict(predict_model, hero1, hero2)
-        action2 = predict(predict_model, hero2, hero1)
+        prediction1 = predict(predict_model, hero1, hero2)
+        prediction2 = predict(predict_model, hero2, hero1)
 
         # 🗡️ Print actions taken
-        print(f"\n🎯 Hero 1 action: {action1}")
-        print(f"🎯 Hero 2 action: {action2}")
+        logger.debug(f"\n🎯 Hero 1 action: {prediction1.action_name}")
+        logger.debug(f"🎯 Hero 2 action: {prediction2.action_name}")
+
+        # 💾 Remember this turn for training later
+        state_features = list(hero1.features.values()) + list(hero2.features.values())  # the input numbers
+        battle_memory.append((state_features, prediction1.action_index, prediction1.action_scores))           # save: state, chosen action, all scores
 
         # Apply actions
-        update_hero_after_action(hero1, action1, hero2)
+        update_hero_after_action(hero1, prediction1.action_name, hero2)
         if hero2.features['rem_hp'] <= 0: # Hero 2 defeated
             break
 
-        update_hero_after_action(hero2, action2, hero1)
+        update_hero_after_action(hero2, prediction2.action_name, hero1)
         if hero1.features['rem_hp'] <= 0: # Hero 1 defeated
             break
 
-        append_to_wins_csv(hero1, hero2, action1)
+        #append_to_wins_csv(hero1, hero2, prediction1.action_name)
 
         round_num += 1
-        time.sleep(0.5)  # small delay for readability
+        time.sleep(round_lag)  # small delay for readability
+        if(round_num>max_rounds): break # circuit breaker
 
     # Append last round's data (winner's last action)
-    append_to_wins_csv(hero1, hero2, action1)
+    #append_to_wins_csv(hero1, hero2, prediction1.action_name)
 
-    print("\n\n--- Game Over ---")
-    if hero1.features['rem_hp'] <= 0 and hero2.features['rem_hp'] <= 0:
-        print("It's a draw! Both heroes have fallen.")
+    logger.debug("\n\n--- Game Over ---")
+
+    # 🏆 Decide winner → this is our reward signal
+    if( hero1.features['rem_hp'] <= 0 and hero2.features['rem_hp'] <= 0):
+        reward = 0  # draw
+        logger.debug("It's a draw! Both heroes have fallen.")
+    elif(hero1.features['rem_hp'] > 0 and hero2.features['rem_hp'] > 0):
+        reward = 0  # draw
+        logger.debug("It's a draw! No hero was defeated, battle was at a stand still.")        
     elif hero1.features['rem_hp'] <= 0:
-        print(f"Hero 2 ({hero2.class_name}) wins the duel!")
+        reward = -1  # hero1 lost
+        logger.debug(f"Hero 2 ({hero2.class_name}) wins the duel!")
     else:
-        print(f"Hero 1 ({hero1.class_name}) wins the duel!")
+        reward = +1  # hero1 won
+        logger.debug(f"Hero 1 ({hero1.class_name}) wins the duel!")
+
+    # 📚 TRAINING STEP: use memory from this battle
+    if reward != 0:  # only train if clear win/loss
+        optimizer.zero_grad()
+        loss_total = 0.0
+
+        for features, action, logits in battle_memory:
+            # 🎯 Turn action into target tensor
+            target = torch.tensor([action], device=DEVICE)
+            # 🧩 Compute loss (nudged by reward)
+            loss = criterion(logits.unsqueeze(0), target) * (-reward)
+            loss_total += loss
+
+        # 🧮 Backprop: nudge model toward good moves, away from bad ones
+        loss_total.backward()
+        optimizer.step()
+        logger.info(f"📖 Model updated with reward={reward}, total loss={loss_total.item():.4f}")
+
+        # 💾 Save updated model
+        torch.save(predict_model.state_dict(), "model/gameai.safetensor")
+        logger.info("💾 Model saved to model/gameai.safetensor")    
+
+def play_games(predict_model, no_of_games:int=1, max_rounds:int=10, round_lag:float=0.1):
+    logger.info("🎲 Welcome to DND Heroes League!")
+    for i in range(0, 100): 
+        play_game(predict_model=predict_model, max_rounds=max_rounds, round_lag=round_lag)

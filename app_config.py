@@ -16,5 +16,6 @@ class AppConfig:
     ACTIONS = ['heal', 'melee_attack', 'magic_missile', 'wand', 'block', 'dodge', 'fire_bow', 'rest', 'cast_protection_1']
     NUM_ACTIONS = len(ACTIONS)
     HIDDEN_LAYER_SIZE = 128  # Avoid hardcoded values
+    TRAINING_MODE = True
 
 CONFIG = AppConfig()

@@ -4,43 +4,53 @@ import random
 import torch
 from app_config import CONFIG
 from hero import Hero
+from prediction import CombatPrediction
 from synth_data import SYNTH_DATA_PATH
+from app_logger import logger
 
-def predict(model, hero1:Hero, hero2:Hero):
-    #hero1 = hero1['features'] # TODO Why dont we want the rem_hp, rem_mana, rem_sta here?
-    #hero2 = hero2['features'] 
+def predict(model, hero1: Hero, hero2: Hero)->CombatPrediction:
+    """
+    Decide the next action for hero1 against hero2.
+
+    Returns:
+      - action_index: int (0-8) → which slot in CONFIG.ACTIONS
+      - action_name: str → human-readable action name
+      - action_scores: tensor of length 9 → raw scores for all actions
+    """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
+
+    # ✅ Each hero must provide exactly half the features
     half = CONFIG.TOTAL_INPUT_FEATURES // 2
-    # Check for missing or additional features
-    #ephemeral = {'is_blocking', 'is_dodging', 'is_casting', 'is_using_wand', 'is_using_bow', 'is_resting', 'is_protected', 'is_healing', 'is_attacking'}
     if len(hero1.features) != half or len(hero2.features) != half:
-        print(f"\n🚨 Input feature length mismatch")
-        print(f"🚨 Each hero must have exactly {half} features (half of TOTAL_INPUT_FEATURES = {CONFIG.TOTAL_INPUT_FEATURES})")
-        print(f"🚨 But received lengths: hero1_feats={len(hero1.features)}, hero2_feats={len(hero2.features)}")
-        print(f"🚨 Check your feature extraction and constants to ensure consistency.\n")
         raise ValueError(
-            f"Input feature length mismatch:\n"
-            f"Each hero must have exactly {half} features (half of TOTAL_INPUT_FEATURES = {CONFIG.TOTAL_INPUT_FEATURES}).\n"
-            f"But received lengths: hero1_feats={len(hero1.features)}, hero2_feats={len(hero2.features)}.\n"
-            f"Check your feature extraction and constants to ensure consistency."
+            f"🚨 Feature length mismatch! hero1={len(hero1.features)}, "
+            f"hero2={len(hero2.features)}, expected each={half}"
         )
 
+    # 🧮 Collect all features: hero1 + hero2 → ~46 numbers
+    all_features = list(hero1.features.values()) + list(hero2.features.values())
 
-    #input_features = torch.tensor([hero1_feats + hero2_feats], dtype=torch.float32).to(device)
-    combined_features = list(hero1.features.values()) + list(hero2.features.values())
-    input_features = torch.tensor(combined_features, dtype=torch.float32).to(device)
+    # 🔢 Turn into a 2D matrix [1, 46] → one row, 46 columns
+    features_matrix = torch.tensor(all_features, dtype=torch.float32).unsqueeze(0).to(device)
 
+    # 🧠 Model forward pass
+    # input [1,46] → output [1,9] (scores for 9 possible actions)
     model.eval()
-    with torch.no_grad():
-        output = model(input_features)
-        #predicted_idx = torch.argmax(output, dim=1).item()
-        predicted_idx = torch.argmax(output).item()
+    action_scores_batch = None
+    if CONFIG.TRAINING_MODE:
+        # keep training trail → allows loss.backward()
+        action_scores_batch = model(features_matrix)
+    else:
+        # faster, less memory → but no training possible
+        with torch.no_grad():
+            action_scores_batch = model(features_matrix)
+    action_scores_batch = model(features_matrix)  # shape [1, 9]
+    action_scores = action_scores_batch[0]        # shape [9], drop batch dimension
+    predicted_action_index = torch.argmax(action_scores).item()  # int 0–8
+    predicted_action_name = CONFIG.ACTIONS[predicted_action_index]         # string label
 
-        prediction = CONFIG.ACTIONS[predicted_idx]
-
-    print(f"🔮 Predicted next action: {prediction}")
-    return prediction
+    logger.debug(f"🔮 Predicted next action: {predicted_action_name}")
+    return CombatPrediction(action_index=predicted_action_index, action_name=predicted_action_name, action_scores=action_scores)
 
 
 def predict_random_sample(model):
@@ -57,11 +67,11 @@ def predict_random_sample(model):
 
     predicted_action = predict(model, hero1_features, hero2_features)
 
-    print("🧪 Testing random duel scenario:")
-    print(f"  Hero1: {dict(zip(header[:half], hero1_features))}")
-    print(f"  Hero2: {dict(zip(header[half:CONFIG.TOTAL_INPUT_FEATURES], hero2_features))}")
-    print(f"  ✅ Actual action:    {actual_action}")
-    print(f"  🔮 Predicted action: {predicted_action}")
+    logger.debug("🧪 Testing random duel scenario:")
+    logger.debug(f"  Hero1: {dict(zip(header[:half], hero1_features))}")
+    logger.debug(f"  Hero2: {dict(zip(header[half:CONFIG.TOTAL_INPUT_FEATURES], hero2_features))}")
+    logger.debug(f"  ✅ Actual action:    {actual_action}")
+    logger.debug(f"  🔮 Predicted action: {predicted_action}")
 
 
 
@@ -79,9 +89,9 @@ def predict_random_sample2(model):
 
     predicted_action = predict(model, hero1_stats, hero2_stats)
 
-    print("🧪 Testing random duel scenario:")
-    print(f"  Hero1: {dict(zip(CONFIG.STAT_NAMES, hero1_stats))}")
-    print(f"  Hero2: {dict(zip(CONFIG.STAT_NAMES, hero2_stats))}")
-    print(f"  ✅ Actual action:    {actual_action}")
-    print(f"  🔮 Predicted action: {predicted_action}")
+    logger.debug("🧪 Testing random duel scenario:")
+    logger.debug(f"  Hero1: {dict(zip(CONFIG.STAT_NAMES, hero1_stats))}")
+    logger.debug(f"  Hero2: {dict(zip(CONFIG.STAT_NAMES, hero2_stats))}")
+    logger.debug(f"  ✅ Actual action:    {actual_action}")
+    logger.debug(f"  🔮 Predicted action: {predicted_action}")
 

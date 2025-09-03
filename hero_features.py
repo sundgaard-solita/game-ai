@@ -48,7 +48,7 @@ def one_hot_encode_hero_class_by_name(hero:Hero):
     Raises:
         ValueError: If any class name is not found in `feature_names`, or class is unknown.
     """
-    print(hero)
+    #print(hero.features)
     if hero.class_name not in CONFIG.HERO_CLASS_NAMES:
         raise ValueError(f"Unknown hero class: {class_name}")
 
